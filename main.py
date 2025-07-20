@@ -4,7 +4,7 @@ from summarizer import *
 from reporter import *
 import config
 
-def run():
+def run(return_changes=False):
     all_changes = {}
     for comp in config.COMPETITORS:
         raw = fetch_changelog(comp["changelog"])
@@ -17,11 +17,13 @@ def run():
         if diff:
             all_changes[comp["name"]] = diff
         save_snapshot(comp["name"], new)
-        print("[DEBUG] all_changes =", all_changes)
+    if return_changes:
+        return all_changes
     if all_changes:
         summary = summarize_all(all_changes)
         if config.SLACK_WEBHOOK:
             send_slack(summary, config.SLACK_WEBHOOK)
+
 
 if __name__ == "__main__":
     print("[DEBUG] Starting Competitor Monitor...")
