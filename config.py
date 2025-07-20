@@ -1,4 +1,14 @@
 import os
+from config import COMPETITORS
+from scraper import is_nsfw_url
+
+VALID_COMPETITORS = [
+    c for c in COMPETITORS if not is_nsfw_url(c["changelog"])
+]
+
+if len(VALID_COMPETITORS) < len(COMPETITORS):
+    print(f"[WARNING] {len(COMPETITORS) - len(VALID_COMPETITORS)} NSFW competitor(s) removed.")
+
 
 # ------------------------------------------------------------------
 # Competitors to monitor
@@ -18,6 +28,10 @@ COMPETITORS = [
     #     "changelog": "https://yourapp.com/updates",
     #     "parser": "html",
     # }
+]
+
+NSFW_KEYWORDS = [
+    "porn", "adult", "xxx", "sex", "nsfw"
 ]
 
 # ------------------------------------------------------------------

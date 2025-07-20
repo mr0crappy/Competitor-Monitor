@@ -3,6 +3,17 @@ from diff_detector import *
 from summarizer import *
 from reporter import *
 import config
+from urllib.parse import urlparse
+from config import NSFW_KEYWORDS
+
+def is_nsfw_url(url: str) -> bool:
+    """Check if a URL is flagged as NSFW based on keywords."""
+    domain = urlparse(url).netloc.lower()
+    for keyword in NSFW_KEYWORDS:
+        if keyword in domain:
+            return True
+    return False
+
 
 def run(return_changes=False):
     all_changes = {}
