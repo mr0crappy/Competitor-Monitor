@@ -1,49 +1,36 @@
 # Competitor Monitor
 
-Monitor competitor changelogs / update feeds, detect what’s new, summarize with an LLM (Groq), and notify a Slack channel on a schedule (GitHub Actions or local cron). Lightweight, extensible, and free‑friendly.
+Monitor competitor changelogs / update feeds, detect what’s new, summarize with an LLM (Groq), and notify a Slack channel on a schedule (GitHub Actions, cron, or the included Flask web dashboard). Lightweight, extensible, and free‑friendly.
 
----
-
-## Table of Contents
-
-* [Overview](#overview)
-* [How It Works](#how-it-works)
-* [Quick Start (TL;DR)](#quick-start-tldr)
-* [Project Structure](#project-structure)
-* [Installation](#installation)
-* [Configuration](#configuration)
-
-  * [Environment Variables](#environment-variables)
-  * [Editing `config.py`](#editing-configpy)
-* [Run Locally](#run-locally)
-* [Test Integrations](#test-integrations)
-
-  * [Test Slack](#test-slack)
-  * [Test Groq Summarization](#test-groq-summarization)
-* [Scheduled Automation (GitHub Actions)](#scheduled-automation-github-actions)
-* [Slack Message Format](#slack-message-format)
-* [Data Persistence & Snapshots](#data-persistence--snapshots)
-* [Extending: Adding Competitors](#extending-adding-competitors)
-* [Troubleshooting](#troubleshooting)
-* [Roadmap](#roadmap)
-* [License](#license)
+> **Note:** Notion export is currently disabled in code (by user choice). Slack is the primary notification channel.
 
 ---
 
 ## Overview
 
-**Competitor Monitor** automatically checks competitor changelog pages (HTML / RSS / etc.), stores snapshots, computes diffs, summarizes changes with a Groq LLM (fallback summary if no key or quota), and posts results to Slack. Designed for reliability in CI (GitHub Actions) and low/no‑cost operation.
+**Competitor Monitor** automatically:
+
+* **Fetches** competitor changelog / release / update pages (HTML, RSS, JSON APIs — basic HTML scraping included; extensible parsers coming).
+* **Snapshots & diffs** the latest fetch vs the prior run to detect *new* lines.
+* **Summarizes** the new material using **Groq LLM** (fallback bullet summary if no key or quota).
+* **Posts** a neatly formatted message to **Slack**.
+* **Serves** an optional **Flask web dashboard** to view competitors, run manual checks, and inspect change history.
+* **Schedules** automatically via **GitHub Actions** (cron) or local cron / systemd timers.
+
+If you only set a Slack webhook, you already get basic bullet notifications. Add a Groq key for nicer LLM summaries.
 
 ---
 
 ## How It Works
 
-1. **Fetch** each competitor’s changelog URL.
-2. **Parse** to raw text lines (basic HTML → text; can plug in richer parsers per competitor).
-3. **Snapshot** current lines; compare to last run to detect new items.
-4. **Summarize** changes across all competitors using Groq (or fallback bullet summary).
-5. **Notify** Slack via Incoming Webhook.
-6. **Schedule** via GitHub Actions (weekly cron) or local cron.
+1. **Fetch** raw content from each competitor URL (configurable per competitor).
+2. **Normalize** (strip HTML → lines; RSS & JSON support planned; see roadmap).
+3. **Snapshot** lines to `data/<competitor>.json`.
+4. **Diff** current vs previous snapshot → list of *new* lines.
+5. **Aggregate & summarize** across competitors (Groq → natural language; fallback bullet counts).
+6. **Notify Slack** (plain text message today; Block Kit coming).
+7. Optional: **Persist snapshots in CI** (artifact or commit) so diffs survive runs.
+8. Optional: **Expose REST API** & dashboard via `server.py`.
 
 ---
 
@@ -54,26 +41,23 @@ Monitor competitor changelogs / update feeds, detect what’s new, summarize wit
 git clone https://github.com/YOUR_USERNAME/Competitor-Monitor.git
 cd Competitor-Monitor
 
-# create venv (optional but recommended)
+# (optional) create virtual env
 python -m venv .venv
-# Windows
-.\.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
+source .venv/bin/activate  # macOS / Linux
+# .\.venv\Scripts\activate  # Windows PowerShell
 
 # install deps
 pip install -r requirements.txt
 
 # set env vars (replace values)
-set SLACK_WEBHOOK="https://hooks.slack.com/services/..."        # PowerShell
-set GROQ_API_KEY="gsk_xxx"
-# or export on bash
+export SLACK_WEBHOOK="https://hooks.slack.com/services/..."
+export GROQ_API_KEY="gsk_xxx"   # optional but recommended
 
 # run once
 python main.py
 ```
 
-If it succeeds you’ll see a message in Slack.
+If successful, you’ll see console diagnostics and (if changes detected or ALWAYS\_NOTIFY=True) a Slack message.
 
 ---
 
@@ -81,30 +65,32 @@ If it succeeds you’ll see a message in Slack.
 
 ```
 Competitor-Monitor/
-├── config.py              # Competitor list, behavior flags, env access
-├── scraper.py             # Fetch & basic HTML→text parsing (with SSL fallback)
-├── diff_detector.py       # Load/save snapshots, compute diffs
-├── summarizer.py          # Groq LLM summarizer + fallback bullet summary
-├── reporter.py            # Send Slack message
-├── main.py                # Orchestrates a full run
-├── server.py              # (optional) Flask API endpoint /api/updates
+├── config.py              # Competitor list & settings (env passthrough)
+├── scraper.py             # Fetch & HTML→text (with SSL fallback)
+├── diff_detector.py       # Load/save per‑competitor snapshots; compute diffs
+├── summarizer.py          # Groq LLM summarizer + safe fallback
+├── reporter.py            # Slack notification helper
+├── main.py                # Orchestrates a full run (CLI / cron / Actions)
+├── server.py              # Optional Flask API + dashboard & manual trigger
+├── templates/             # index.html (served by Flask)
+├── static/
+│   ├── css/style.css      # Dashboard styles
+│   └── js/app.js          # Dashboard logic (talks to /api/*)
+├── data/                  # Snapshot storage (*.json) (gitignored)
 ├── requirements.txt       # Python deps
-├── data/                  # Snapshots saved per competitor (JSON)
 └── README.md              # You are here
 ```
 
-> **Note**: The `data/` directory should be writable. In GitHub Actions, snapshots are ephemeral unless you persist them (artifact upload or branch commit). See [Data Persistence & Snapshots](#data-persistence--snapshots).
+> **CI note:** `data/` is ephemeral in GitHub Actions unless persisted; see [Data Persistence & Snapshots](#data-persistence--snapshots).
 
 ---
 
 ## Installation
 
-Follow these steps on any machine with internet access.
-
 ### 1. Clone
 
 ```bash
-git clone https://github.com/mr0crappy/Competitor-Monitor.git
+git clone https://github.com/YOUR_USERNAME/Competitor-Monitor.git
 cd Competitor-Monitor
 ```
 
@@ -112,49 +98,46 @@ cd Competitor-Monitor
 
 ```bash
 python -m venv .venv
-# Windows
-.\.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
+source .venv/bin/activate  # macOS/Linux
+# .\.venv\Scripts\activate  # Windows
 ```
 
-### 3. Install Dependencies
+### 3. Install Deps
 
 ```bash
 pip install -r requirements.txt
 ```
 
-If you get SSL or network errors installing packages, ensure Python and pip are updated:
+If pip errors:
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
 ```
 
 ---
 
 ## Configuration
 
-You configure the monitor via **environment variables** and **`config.py`**.
+You configure via **environment variables** and **`config.py`**.
 
 ### Environment Variables
 
-Set these before running (locally or in CI):
+| Variable                      | Required         | Description                                                    |
+| ----------------------------- | ---------------- | -------------------------------------------------------------- |
+| `SLACK_WEBHOOK`               | **Yes**          | Incoming Webhook URL to post updates.                          |
+| `GROQ_API_KEY`                | No (recommended) | Enables Groq LLM summaries; fallback bullet summary otherwise. |
+| `SUMMARIZER_MAX_ITEMS`        | No               | Per‑competitor cap of lines passed to LLM.                     |
+| `SUMMARIZER_MAX_PROMPT_CHARS` | No               | Global prompt length safety cap.                               |
 
-| Variable                      | Required         | Description                                                        |
-| ----------------------------- | ---------------- | ------------------------------------------------------------------ |
-| `SLACK_WEBHOOK`               | Yes              | Incoming Webhook URL for your Slack channel.                       |
-| `GROQ_API_KEY`                | No (recommended) | Enables Groq LLM summaries; without it you get a fallback summary. |
-| `SUMMARIZER_MAX_ITEMS`        | No               | Override per‑competitor cap of updates passed to LLM.              |
-| `SUMMARIZER_MAX_PROMPT_CHARS` | No               | Max characters in LLM prompt (safety).                             |
-
-**Windows (PowerShell) example:**
+**PowerShell:**
 
 ```powershell
 $env:SLACK_WEBHOOK="https://hooks.slack.com/services/..."
 $env:GROQ_API_KEY="gsk_your_key"
 ```
 
-**macOS / Linux example:**
+**macOS / Linux:**
 
 ```bash
 export SLACK_WEBHOOK="https://hooks.slack.com/services/..."
@@ -182,23 +165,23 @@ SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY")
 
 # Behavior flags
-ALWAYS_NOTIFY = True              # send Slack message even if no changes (useful while testing)
+ALWAYS_NOTIFY = True              # send Slack message even if no changes (great for testing)
 MAX_LINES_PER_COMPETITOR = 50     # trim noise before diffing
 ```
 
-Add more competitors by appending dicts to `COMPETITORS`.
+Add more competitors by appending dicts (see below).
 
 ---
 
 ## Run Locally
 
-Run a full cycle and send a Slack message:
+Run a full monitor cycle and send a Slack message:
 
 ```bash
 python main.py
 ```
 
-Expected console output:
+Expected console output (typical):
 
 ```
 [DEBUG] Starting Competitor Monitor (Slack + Groq).
@@ -210,19 +193,39 @@ Expected console output:
 [INFO] Message sent to Slack.
 ```
 
-Check your Slack channel for the summary.
+Check your Slack channel.
+
+---
+
+## Run Flask Dashboard
+
+Launch the optional web UI + REST API:
+
+```bash
+python server.py
+```
+
+Open: [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+From the dashboard you can:
+
+* See competitor list & status
+* Trigger **Run Monitor** (POST /api/run-monitor)
+* View recent change history (GET /api/changes)
+* See stats (/api/dashboard)
+
+### Flask Environment Ports
+
+On Railway (or other PaaS), the platform typically sets `PORT`. The server uses `os.getenv("PORT", 5000)` so it works locally and in hosted environments.
 
 ---
 
 ## Test Integrations
 
-Sometimes you want to confirm Slack & Groq work *before* scraping.
-
 ### Test Slack
 
-Create `test_slack.py`:
-
 ```python
+# test_slack.py
 import os, requests
 url = os.getenv("SLACK_WEBHOOK")
 print("Slack configured?", bool(url))
@@ -231,17 +234,14 @@ if url:
     print("HTTP", r.status_code, r.text)
 ```
 
-Run:
-
 ```bash
 python test_slack.py
 ```
 
 ### Test Groq Summarization
 
-Create `test_groq.py`:
-
 ```python
+# test_groq.py
 import os
 from groq import Groq
 
@@ -266,7 +266,7 @@ print(resp.choices[0].message.content)
 
 ## Scheduled Automation (GitHub Actions)
 
-Run the monitor every Monday at 09:00 UTC (change as needed).
+Run the monitor **every Monday at 09:00 UTC** (change as needed). *09:00 UTC ≈ 14:30 IST (Asia/Kolkata).* To run at 09:00 IST use cron `30 3 * * 1`.
 
 Create `.github/workflows/weekly.yml`:
 
@@ -302,20 +302,20 @@ jobs:
 
 ### Add Secrets in GitHub
 
-Repo → *Settings* → *Secrets and variables* → *Actions* → *New repository secret*:
+Repo → **Settings** → **Secrets and variables** → **Actions** → *New repository secret*:
 
 * `SLACK_WEBHOOK`
 * `GROQ_API_KEY`
 
-Trigger a manual test: Repo → *Actions* → *Weekly Competitor Report* → *Run workflow*.
-
-> **India Time (IST)?** 09:00 UTC ≈ 14:30 IST. To run at 09:00 IST use: `30 3 * * 1` (03:30 UTC).
+Trigger a manual run: Repo → **Actions** → *Weekly Competitor Report* → *Run workflow*.
 
 ---
 
 ## Slack Message Format
 
-Current implementation sends plain text. Example:
+Current implementation: plain text block.
+
+Example:
 
 ```
 Weekly Competitor Monitor Summary
@@ -326,23 +326,27 @@ GitHub: 3 change(s)
   - Security advisory UI refresh
 ```
 
-You can upgrade formatting (blocks, emojis) in `reporter.py` later.
+You can enhance formatting in `reporter.py` using Slack Block Kit (emoji for change types: 🆕 feature, 💰 pricing, ⚠️ security, 📣 announcement, 🐛 fix).
 
 ---
 
 ## Data Persistence & Snapshots
 
-We store previously fetched content per competitor so we only alert on *new* lines.
+We store previously fetched content per competitor to detect *new* lines only.
 
-* Files are written under `data/NAME.json`.
-* First run seeds the snapshot; subsequent runs diff.
-* In GitHub Actions, the filesystem is ephemeral. Three strategies:
+* Snapshots live under `data/<competitor>.json`.
+* First run seeds snapshot (no alert unless ALWAYS\_NOTIFY=True).
+* Subsequent runs diff → alerts only for new lines.
 
-  1. **No persistence** – every run treated as first run (alerts noisy).
-  2. **Upload artifact** – save `data/` as workflow artifact; download next run.
-  3. **Commit back to a branch** – workflow commits updated snapshots to `monitor-data` branch.
+### CI Persistence Strategies
 
-If you want me to provide an artifact‑persistence workflow, let me know.
+| Strategy        | Effort | Noise | Notes                                                        |
+| --------------- | ------ | ----- | ------------------------------------------------------------ |
+| **None**        | Zero   | High  | Every run behaves like first; all lines considered new.      |
+| **Artifact**    | Low    | Low   | Upload `data/` artifact at end; download at start.           |
+| **Commit Back** | Med    | Low   | Workflow commits updated `data/` to branch (`monitor-data`). |
+
+Let me know if you want ready‑to‑paste workflow steps for artifact persistence.
 
 ---
 
@@ -352,25 +356,88 @@ Add entries in `config.py`:
 
 ```python
 COMPETITORS = [
-    {"name": "GitHub", "changelog": "https://github.blog/changelog/"},
-    {"name": "FooApp", "changelog": "https://fooapp.com/updates"},
+    {"name": "GitHub",  "changelog": "https://github.blog/changelog/"},
+    {"name": "FooApp",  "changelog": "https://fooapp.com/updates"},
 ]
 ```
 
-### Parsing Modes (future)
-
-We can support richer parsing by adding optional keys:
+### Example Competitor Catalog (copy/paste)
 
 ```python
-{
-  "name": "FooApp",
-  "changelog": "https://fooapp.com/changelog.xml",
-  "parser": "rss",            # handle via feedparser
-  "allow_insecure": False,      # override SSL fallback behavior
-}
+COMPETITORS = [
+    {
+        "name": "GitHub",
+        "changelog": "https://github.blog/changelog/",
+        "description": "Official GitHub product updates and feature releases."
+    },
+    {
+        "name": "GitLab",
+        "changelog": "https://about.gitlab.com/releases/",
+        "description": "GitLab release notes."
+    },
+    {
+        "name": "Notion",
+        "changelog": "https://www.notion.so/releases",
+        "description": "Notion product updates."
+    },
+    {
+        "name": "Slack",
+        "changelog": "https://slack.com/release-notes/windows",
+        "description": "Slack desktop release notes (Windows feed; pick platform)."
+    },
+    {
+        "name": "Vercel",
+        "changelog": "https://vercel.com/changelog",
+        "description": "Vercel platform updates."
+    },
+    {
+        "name": "OpenAI",
+        "changelog": "https://openai.com/research",
+        "description": "Research & product announcements from OpenAI."
+    },
+]
 ```
 
-Let me know if you need an RSS parser or site‑specific HTML parser; I’ll generate it.
+> You can also add competitors at runtime via the dashboard (`/api/competitors`, POST).
+
+---
+
+## Live Dashboard
+
+The optional dashboard (served by `server.py`) lets you interact with the monitor without touching the CLI.
+
+### Start
+
+```bash
+python server.py
+```
+
+### Open
+
+[http://localhost:5000](http://localhost:5000)
+
+### Manual Monitor Run
+
+Click **Run Monitor** in the header, or call:
+
+```bash
+curl -X POST http://localhost:5000/api/run-monitor
+```
+
+### API Endpoints
+
+| Method | Path                              | Description                                          |
+| ------ | --------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/dashboard`                  | Summary stats (competitors, recent changes, status). |
+| GET    | `/api/competitors`                | List competitors currently loaded.                   |
+| POST   | `/api/competitors`                | Add competitor `{name, changelog, description?}`.    |
+| PUT    | `/api/competitors/<id>`           | Update competitor.                                   |
+| DELETE | `/api/competitors/<id>`           | Remove competitor.                                   |
+| GET    | `/api/changes?competitor=&days=7` | Recent changes (filterable).                         |
+| POST   | `/api/run-monitor`                | Trigger a monitoring run (returns detected changes). |
+| GET    | `/api/status`                     | Task status counters.                                |
+| GET    | `/api/analytics`                  | Lightweight chart data for dashboard.                |
+| GET    | `/health`                         | Healthcheck (returns `{status:"ok"}`).               |
 
 ---
 
@@ -378,60 +445,77 @@ Let me know if you need an RSS parser or site‑specific HTML parser; I’ll gen
 
 ### No Slack Message
 
-* Confirm `SLACK_WEBHOOK` env var.
-* Check GitHub Actions logs for `[INFO] Message sent to Slack.`
-* If `all_changes = {}` and `ALWAYS_NOTIFY = False`, nothing is sent.
+* Confirm `SLACK_WEBHOOK` exported in environment / CI secrets.
+* Check run output: If `all_changes={}` and `ALWAYS_NOTIFY=False`, nothing is sent.
+* During testing set `ALWAYS_NOTIFY=True` in `config.py`.
 
 ### `[Groq Missing]` in Slack
 
-* `GROQ_API_KEY` not set or not visible in env.
-* Add key locally or in GitHub Secrets.
+* `GROQ_API_KEY` not set or not visible.
+* Free usage? Fallback summary still posts; set key when ready.
 
-### Groq Error: model decommissioned
+### Groq Error: *model decommissioned*
 
-* Update model in `summarizer.py` (e.g., `llama-3.1-8b-instant`).
+* Update `summarizer.py` to a supported model (default: `llama-3.1-8b-instant`).
 
 ### SSL Handshake Failure
 
-Seen as:
+Console example:
 
 ```
 SSLError: SSLV3_ALERT_HANDSHAKE_FAILURE
+[Warning] SSL handshake failed for https://acme.com/changelog, retrying with verify=False...
 ```
 
-We retry with `verify=False`. If still failing:
+We retry with `verify=False`. If fallback also fails:
 
-* Site truly broken; consider alternate feed (RSS, API, blog JSON).
-* Temporarily remove that competitor.
+* Site may block bots, require SNI, or need a different URL (RSS?).
+* Temporarily remove the competitor from `config.py`.
 
-### Not Enough Changes Detected
+### Timezone Error (TypeError: can't compare offset-naive and offset-aware datetimes)
 
-Remember: only *new* lines relative to last snapshot are counted. Delete that competitor’s snapshot JSON to force a full diff.
+Use `datetime.now(timezone.utc)` when comparing with ISO timestamps that include `Z` or offsets. Fixed in recent `server.py`.
+
+### Nothing Updating in Dashboard
+
+* Confirm you're hitting the **Flask API** (network console: 200 responses?).
+* Check server logs for exceptions.
+* Ensure `app.js` points to correct backend base (defaults to window\.origin).
 
 ---
 
 ## Roadmap
 
-* Rich per‑site parsers (title, date, tags).
-* Slack Block Kit formatting (emoji categories: 🆕, 💰, ⚠️).
-* Monthly rollup mode.
-* Notion export (on hold by user request).
-* Web dashboard (React) optional deploy.
+* 🔄 RSS + JSON feed parsers (auto-detect).
+* 🧠 LLM classification of change type (feature, pricing, bug fix, messaging).
+* 💬 Slack Block Kit formatting + emoji categories.
+* 📅 Monthly & quarterly rollups.
+* 📘 Notion export (paused; user optional).
+* 📊 Persistent DB (SQLite) instead of JSON snapshots.
 
 ---
 
 ## License
 
-MIT License. See `LICENSE` file (add one if missing).
+MIT License. See `LICENSE` (add if missing).
+
+```
+MIT License
+
+Copyright (c) YEAR YOUR_NAME
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+... (standard MIT text) ...
+```
 
 ---
 
 ## Maintainer Notes
 
-* Safe to fork & customize.
-* Keep secrets in CI; never commit keys.
-* When adding a new LLM provider, wrap in try/except and fallback to bullet counts.
+* Keep secrets in env/CI; never commit keys.
+* Fail soft: wrap external calls in try/except; degrade gracefully.
+* When adding new LLM providers, return fallback summary on error.
+* For production usage, persist `data/` between runs.
 
 ---
 
-**Need help wiring artifact persistence, richer parsing, or Slack formatting? Let me know and I’ll generate the code.**
