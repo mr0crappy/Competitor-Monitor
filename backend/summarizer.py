@@ -76,5 +76,9 @@ def summarize_all(changes: dict,
         return completion.choices[0].message.content.strip()
 
     except Exception as e:
-        print(f"[Groq Error] {e}")
+        import traceback
+        print("[Groq Error]", e)
+        traceback.print_exc()
         return "[Groq Error] (Fallback summary)\n" + prompt_text[:1000]
+
+
