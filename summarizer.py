@@ -1,6 +1,6 @@
+import os
 from openai import OpenAI
-client = OpenAI(api_key="YOUR_OPENAI_KEY")
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def summarize_all(changes: dict) -> str:
     prompt = "Here are the updates from competitors:\n"
     for name, items in changes.items():
