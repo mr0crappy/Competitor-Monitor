@@ -4,14 +4,13 @@ def fetch_changelog(url):
     headers = {"User-Agent": "Mozilla/5.0 (Competitor Monitor)"}
     
     try:
-        # First attempt (strict SSL)
+        # Attempt with normal SSL
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
         return resp.text
     except requests.exceptions.SSLError:
         print(f"[Warning] SSL handshake failed for {url}, retrying with verify=False...")
         try:
-            # Fallback attempt (ignore SSL verification)
             resp = requests.get(url, headers=headers, verify=False, timeout=15)
             resp.raise_for_status()
             return resp.text
