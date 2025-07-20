@@ -6,3 +6,11 @@ startCommand = "cd backend && python server.py"
 
 [[services]]
 name = "competitor-monitor"
+
+providers = ["python"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python server.py
