@@ -2,16 +2,13 @@
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
-from main import run
-from reporter import send_slack
-from summarizer import summarize_all
-import config
-import os
-import threading
-import time
+import os, threading, time
+from datetime import datetime, timedelta, timezone
 import schedule
-from datetime import datetime, timedelta
-from datetime import timezone
+
+import config
+from main import run, get_valid_competitors  # <-- import helper
+
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend connection
@@ -31,16 +28,27 @@ MOCK_DATA = {
 }
 
 # Initialize with existing competitors from config
-for i, comp in enumerate(config.COMPETITORS):
+# Initialize with existing competitors from config (filtered NSFW-safe)
+for i, comp in enumerate(get_valid_competitors()):
     MOCK_DATA["competitors"].append({
         "id": i + 1,
         "name": comp["name"],
         "changelog": comp["changelog"],
         "description": comp.get("description", ""),
         "status": "active",
-        "lastUpdate": datetime.now().isoformat(),
-        "changesDetected": 0
+        "lastUpdate": datetime.utcnow().isoformat() + "Z",
+        "changesDetected": 0,
     })
+
+def _parse_iso(ts: str) -> datetime:
+    """Parse ISO string that may end with 'Z' into UTC-aware datetime."""
+    if ts.endswith("Z"):
+        ts = ts[:-1] + "+00:00"
+    dt = datetime.fromisoformat(ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 # Serve static files (frontend)
 @app.route('/')
@@ -59,10 +67,8 @@ def get_dashboard():
 
     now = datetime.now(timezone.utc)  # make aware
     recent_changes_24h = len([
-        c for c in MOCK_DATA["recent_changes"]
-        if datetime.fromisoformat(
-            c["timestamp"].replace('Z', '+00:00')
-        ) > now - timedelta(hours=24)
+    c for c in MOCK_DATA["recent_changes"]
+    if _parse_iso(c["timestamp"]) > now_utc - timedelta(hours=24)
     ])
 
     return jsonify({
@@ -112,21 +118,31 @@ def update_competitor(competitor_id):
 
 @app.route("/api/competitors/<int:competitor_id>", methods=["DELETE"])
 def delete_competitor(competitor_id):
-    """Delete a competitor and clear its related changes."""
-    competitor = next((c for c in MOCK_DATA["competitors"] if c["id"] == competitor_id), None)
-    
-    if not competitor:
+    """Delete a competitor and purge related change history + snapshot."""
+    comp = next((c for c in MOCK_DATA["competitors"] if c["id"] == competitor_id), None)
+    if not comp:
         return jsonify({"error": "Competitor not found"}), 404
 
-    # Remove competitor
+    name = comp["name"]
+
+    # Remove from in-memory list
     MOCK_DATA["competitors"] = [c for c in MOCK_DATA["competitors"] if c["id"] != competitor_id]
-    
-    # Remove all changes related to this competitor
-    before_count = len(MOCK_DATA["recent_changes"])
-    MOCK_DATA["recent_changes"] = [ch for ch in MOCK_DATA["recent_changes"] if ch["competitor"] != competitor["name"]]
-    removed_changes = before_count - len(MOCK_DATA["recent_changes"])
-    
+
+    # Remove change history
+    before = len(MOCK_DATA["recent_changes"])
+    MOCK_DATA["recent_changes"] = [ch for ch in MOCK_DATA["recent_changes"] if ch["competitor"] != name]
+    removed_changes = before - len(MOCK_DATA["recent_changes"])
+
+    # Remove snapshot file (if exists)
+    snap_path = os.path.join("data", f"{name}.json")
+    if os.path.exists(snap_path):
+        os.remove(snap_path)
+
+    # Also remove from config.COMPETITORS so future runs skip it
+    config.COMPETITORS[:] = [c for c in config.COMPETITORS if c["name"] != name]
+
     return jsonify({"success": True, "removed_changes": removed_changes})
+
 
 
 @app.route("/api/changes", methods=["GET"])
@@ -136,9 +152,9 @@ def get_changes():
     days = int(request.args.get("days", 7))
 
     now = datetime.now(timezone.utc)  # make aware
-    cutoff_date = now - timedelta(days=days)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    changes = [c for c in changes if _parse_iso(c["timestamp"]) > cutoff_date]
 
-    changes = MOCK_DATA["recent_changes"]
 
     # Filter by competitor if specified
     if competitor_filter:
