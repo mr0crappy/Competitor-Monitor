@@ -24,5 +24,12 @@ def run():
         if config.NOTION_TOKEN:
             send_notion(summary, config.NOTION_TOKEN, config.NOTION_DB_ID)
 
-if __name__ =="__main__":
-    run()
+if __name__ == "__main__":
+    try:
+        run()
+    except Exception as e:
+        import traceback
+        print("[ERROR] Uncaught exception:")
+        traceback.print_exc()
+        exit(1)
+
