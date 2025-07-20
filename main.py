@@ -17,6 +17,7 @@ def run():
         if diff:
             all_changes[comp["name"]] = diff
         save_snapshot(comp["name"], new)
+        print("[DEBUG] all_changes =", all_changes)
     if all_changes:
         summary = summarize_all(all_changes)
         if config.SLACK_WEBHOOK:
