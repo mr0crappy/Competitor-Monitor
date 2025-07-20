@@ -2,7 +2,7 @@ import os
 from groq import Groq
 
 # Defaults (override via env if you want)
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 MAX_ITEMS_PER_COMP = int(os.getenv("SUMMARIZER_MAX_ITEMS", "50"))       # cap list size sent to LLM
 MAX_CHARS_PROMPT   = int(os.getenv("SUMMARIZER_MAX_PROMPT_CHARS", "20000"))  # total char safety cap
 
