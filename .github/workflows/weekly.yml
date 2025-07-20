@@ -22,6 +22,6 @@ jobs:
 
       - name: Run monitor
         env:
-            GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: python main.py
