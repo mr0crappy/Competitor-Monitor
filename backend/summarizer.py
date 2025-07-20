@@ -27,15 +27,12 @@ def _prepare_prompt_text(changes: dict) -> str:
     parts = []
     for name, items in changes.items():
         parts.append(f"{name} Updates:")
-        # trim per-competitor
-        trimmed = items[:MAX_ITEMS_PER_COMP]
+        trimmed = items[:MAX_ITEMS_PER_COMP]  # limit items
         for i, change in enumerate(trimmed, 1):
-            # collapse whitespace; trim super long lines
             compact = " ".join(change.split())
             parts.append(f"{i}. {compact[:500]}")
         parts.append("")  # blank line
     text = "\n".join(parts)
-    # global cap
     if len(text) > MAX_CHARS_PROMPT:
         text = text[:MAX_CHARS_PROMPT] + "\n...[truncated]..."
     return text
@@ -51,7 +48,7 @@ def summarize_all(changes: dict,
     if not changes:
         return "No new changes detected this run."
 
-    api_key = os.getenv("GROQ_API_KEY")  # read at call time
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         return "[Groq Missing] " + _fallback_summary(changes)
 
@@ -79,6 +76,5 @@ def summarize_all(changes: dict,
         return completion.choices[0].message.content.strip()
 
     except Exception as e:
-        # Don’t dump API key or raw exception text to Slack; keep it short.
         print(f"[Groq Error] {e}")
-        return "[Groq Error] (Fallback summary)\n" + text[:1000]
+        return "[Groq Error] (Fallback summary)\n" + prompt_text[:1000]
