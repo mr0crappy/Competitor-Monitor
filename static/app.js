@@ -380,15 +380,21 @@ function editCompetitor(id) {
   document.getElementById("competitorModalOverlay").classList.add("active");
 }
 async function deleteCompetitor(id) {
-  if (!confirm("Delete this competitor?")) return;
-  try {
-    await API.deleteCompetitor(id);
-    appState.competitors = appState.competitors.filter((c) => c.id !== id);
-    renderCompetitors();
-    renderDashboard();
-    showToast("Competitor deleted.");
-  } catch (_) {}
+  if (confirm('Are you sure you want to delete this competitor?')) {
+    const response = await fetch(`/api/competitors/${id}`, { method: 'DELETE' });
+    const result = await response.json();
+    
+    if (result.success) {
+      appState.competitors = appState.competitors.filter(c => c.id !== id);
+      appState.changes = appState.changes.filter(ch => ch.competitor !== id); // Ensure changes are updated
+      renderCompetitors();
+      renderChanges();
+      renderDashboard();
+      showToast(`Competitor deleted (removed ${result.removed_changes} changes).`);
+    }
+  }
 }
+
 function closeCompetitorModal() {
   document.getElementById("competitorModalOverlay").classList.remove("active");
   appState.editingCompetitor = null;

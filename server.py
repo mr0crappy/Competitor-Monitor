@@ -112,8 +112,22 @@ def update_competitor(competitor_id):
 
 @app.route("/api/competitors/<int:competitor_id>", methods=["DELETE"])
 def delete_competitor(competitor_id):
+    """Delete a competitor and clear its related changes."""
+    competitor = next((c for c in MOCK_DATA["competitors"] if c["id"] == competitor_id), None)
+    
+    if not competitor:
+        return jsonify({"error": "Competitor not found"}), 404
+
+    # Remove competitor
     MOCK_DATA["competitors"] = [c for c in MOCK_DATA["competitors"] if c["id"] != competitor_id]
-    return jsonify({"success": True})
+    
+    # Remove all changes related to this competitor
+    before_count = len(MOCK_DATA["recent_changes"])
+    MOCK_DATA["recent_changes"] = [ch for ch in MOCK_DATA["recent_changes"] if ch["competitor"] != competitor["name"]]
+    removed_changes = before_count - len(MOCK_DATA["recent_changes"])
+    
+    return jsonify({"success": True, "removed_changes": removed_changes})
+
 
 @app.route("/api/changes", methods=["GET"])
 def get_changes():
