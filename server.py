@@ -239,6 +239,10 @@ def update_settings():
     # In a real implementation, you'd save these to environment or config
     return jsonify({"success": True, "message": "Settings updated successfully"})
 
+@app.route('/health')
+def health():
+    return jsonify({"status": "ok"}), 200
+
 # Background monitoring scheduler
 def background_monitor():
     """Run monitoring in background"""
