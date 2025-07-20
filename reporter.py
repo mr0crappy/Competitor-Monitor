@@ -1,6 +1,9 @@
-from slack_sdk.webhook import WebhookClient
+import requests
 
-def send_slack(text, url):
-    client = WebhookClient(url)
-    resp = client.send(text=text)
-    resp.raise_for_status()
+def send_slack(message, webhook_url):
+    try:
+        resp = requests.post(webhook_url, json={"text": message})
+        resp.raise_for_status()
+        print("[INFO] Message sent to Slack.")
+    except Exception as e:
+        print(f"[ERROR] Failed to send Slack message: {e}")
