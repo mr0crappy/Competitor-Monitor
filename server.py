@@ -70,6 +70,7 @@ def get_dashboard():
     now = datetime.now(timezone.utc)  # make aware
     recent_changes_24h = len([
     c for c in MOCK_DATA["recent_changes"]
+    now_utc = datetime.now(timezone.utc)
     if _parse_iso(c["timestamp"]) > now_utc - timedelta(hours=24)
     ])
 
