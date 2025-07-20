@@ -8,6 +8,9 @@ def run():
     all_changes = {}
     for comp in config.COMPETITORS:
         raw = fetch_changelog(comp["changelog"])
+        if raw is None:
+         print(f"[Skipped] Could not fetch changelog for {comp['name']}.")
+         continue
         old = load_snapshot(comp["name"])
         new = raw.splitlines()
         diff = compute_diff(old, new)
