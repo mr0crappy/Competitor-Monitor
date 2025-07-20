@@ -11,6 +11,7 @@ import threading
 import time
 import schedule
 from datetime import datetime, timedelta
+from datetime import timezone
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend connection
@@ -53,10 +54,16 @@ def serve_static(path):
 # API Routes
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
+    """Get dashboard overview data"""
     active_competitors = [c for c in MOCK_DATA["competitors"] if c["status"] == "active"]
-    recent_changes_24h = len([c for c in MOCK_DATA["recent_changes"]
-                             if datetime.fromisoformat(c["timestamp"].replace('Z', '+00:00'))
-                             > datetime.now() - timedelta(hours=24)])
+
+    now = datetime.now(timezone.utc)  # make aware
+    recent_changes_24h = len([
+        c for c in MOCK_DATA["recent_changes"]
+        if datetime.fromisoformat(
+            c["timestamp"].replace('Z', '+00:00')
+        ) > now - timedelta(hours=24)
+    ])
 
     return jsonify({
         "totalCompetitors": len(MOCK_DATA["competitors"]),
@@ -110,18 +117,27 @@ def delete_competitor(competitor_id):
 
 @app.route("/api/changes", methods=["GET"])
 def get_changes():
+    """Get recent changes with optional filtering"""
     competitor_filter = request.args.get("competitor")
     days = int(request.args.get("days", 7))
+
+    now = datetime.now(timezone.utc)  # make aware
+    cutoff_date = now - timedelta(days=days)
+
     changes = MOCK_DATA["recent_changes"]
 
+    # Filter by competitor if specified
     if competitor_filter:
         changes = [c for c in changes if c["competitor"] == competitor_filter]
 
-    cutoff_date = datetime.now() - timedelta(days=days)
-    changes = [c for c in changes
-               if datetime.fromisoformat(c["timestamp"].replace('Z', '+00:00')) > cutoff_date]
+    # Filter by date
+    changes = [
+        c for c in changes
+        if datetime.fromisoformat(c["timestamp"].replace('Z', '+00:00')) > cutoff_date
+    ]
 
     return jsonify({"changes": changes})
+
 
 @app.route("/api/run-monitor", methods=["POST"])
 def run_monitor():
