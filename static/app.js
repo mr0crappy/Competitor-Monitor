@@ -540,49 +540,32 @@ function initQuickActions() {
 // API Functions (Mock Implementation)
 const API = {
   async getDashboard() {
-    return Promise.resolve(appState.dashboard_stats);
+    const res = await fetch(`${appState.settings.backend_url}/api/dashboard`);
+    return await res.json();
   },
-  
+
   async getCompetitors() {
-    return Promise.resolve(appState.competitors);
+    const res = await fetch(`${appState.settings.backend_url}/api/competitors`);
+    return await res.json();
   },
-  
+
   async addCompetitor(data) {
-    return Promise.resolve({ success: true, data });
+    const res = await fetch(`${appState.settings.backend_url}/api/competitors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return await res.json();
   },
-  
-  async updateCompetitor(id, data) {
-    return Promise.resolve({ success: true, data });
-  },
-  
-  async deleteCompetitor(id) {
-    return Promise.resolve({ success: true });
-  },
-  
-  async getChanges(filters = {}) {
-    return Promise.resolve(appState.changes);
-  },
-  
+
   async runMonitor() {
-    return Promise.resolve({ success: true, message: 'Monitor started' });
-  },
-  
-  async getStatus() {
-    return Promise.resolve(appState.dashboard_stats);
-  },
-  
-  async getAnalytics() {
-    return Promise.resolve(appState.analytics);
-  },
-  
-  async getSettings() {
-    return Promise.resolve(appState.settings);
-  },
-  
-  async updateSettings(data) {
-    return Promise.resolve({ success: true, data });
+    const res = await fetch(`${appState.settings.backend_url}/api/run-monitor`, {
+      method: 'POST'
+    });
+    return await res.json();
   }
 };
+
 
 // Add CSS for spin animation
 const style = document.createElement('style');
