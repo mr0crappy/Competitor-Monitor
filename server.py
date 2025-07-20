@@ -5,6 +5,8 @@ from flask_cors import CORS
 import os, threading, time
 from datetime import datetime, timedelta, timezone
 import schedule
+from summarizer import summarize_all
+
 
 import config
 from main import run, get_valid_competitors  # <-- import helper
