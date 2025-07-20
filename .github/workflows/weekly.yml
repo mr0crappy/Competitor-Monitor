@@ -22,8 +22,6 @@ jobs:
 
       - name: Run monitor
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+            GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
         run: python main.py
