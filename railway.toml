@@ -1,16 +1,9 @@
 [build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "cd backend && python server.py"
+builder = "nixpacks"   # lowercase is recommended
 
 [[services]]
 name = "competitor-monitor"
 
-providers = ["python"]
-
-[phases.install]
-cmds = ["pip install -r requirements.txt"]
-
-[start]
-cmd = "python server.py
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
