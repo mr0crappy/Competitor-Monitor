@@ -80,5 +80,5 @@ def summarize_all(changes: dict,
 
     except Exception as e:
         # Don’t dump API key or raw exception text to Slack; keep it short.
-        print(f"[WARN] Groq summarization failed: {e}")
-        return "[Groq Error] " + _fallback_summary(changes)
+        print(f"[Groq Error] {e}")
+        return "[Groq Error] (Fallback summary)\n" + text[:1000]
