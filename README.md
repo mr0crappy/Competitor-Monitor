@@ -104,7 +104,7 @@ Follow these steps on any machine with internet access.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/Competitor-Monitor.git
+git clone https://github.com/mr0crappy/Competitor-Monitor.git
 cd Competitor-Monitor
 ```
 
