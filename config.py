@@ -1,6 +1,10 @@
 import os
-from config import COMPETITORS
 from scraper import is_nsfw_url
+
+COMPETITORS = [
+    {"name": "GitHub", "changelog": "https://github.blog/changelog/"},
+    {"name": "Notion", "changelog": "https://www.notion.so/releases"},
+]
 
 VALID_COMPETITORS = [
     c for c in COMPETITORS if not is_nsfw_url(c["changelog"])
