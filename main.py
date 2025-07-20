@@ -22,10 +22,9 @@ def run():
         summary = summarize_all(all_changes)
         if config.SLACK_WEBHOOK:
             send_slack(summary, config.SLACK_WEBHOOK)
-        if config.NOTION_TOKEN:
-            send_notion(summary, config.NOTION_TOKEN, config.NOTION_DB_ID)
 
 if __name__ == "__main__":
+    print("[DEBUG] Starting Competitor Monitor...")
     try:
         run()
     except Exception as e:
