@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pastel Competitor Monitoring Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <header class="shadow-sm pastel-header">
+      <nav class="container flex items-center justify-between py-16">
+        <h1 class="dashboard-title">Competitor Monitor</h1>
+        <ul class="flex gap-16" role="tablist">
+          <li><button class="btn btn--secondary nav-btn" data-target="dashboard">Dashboard</button></li>
+          <li><button class="btn btn--secondary nav-btn" data-target="competitors">Competitors</button></li>
+          <li><button class="btn btn--secondary nav-btn" data-target="changes">Changes</button></li>
+          <li><button class="btn btn--secondary nav-btn" data-target="analytics">Analytics</button></li>
+          <li><button class="btn btn--secondary nav-btn" data-target="settings">Settings</button></li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- Pages -->
+    <main class="container my-8">
+      <!-- Dashboard Page -->
+      <section id="dashboard" class="page">
+        <div class="grid dashboard-grid gap-16">
+          <div class="card card--gradient-lavender">
+            <div class="card__body flex flex-col gap-8 items-center">
+              <h3>Total Competitors</h3>
+              <p id="totalCompetitors" class="stat-number"></p>
+            </div>
+          </div>
+
+          <div class="card card--gradient-mint">
+            <div class="card__body flex flex-col gap-8 items-center">
+              <h3>Active Competitors</h3>
+              <p id="activeCompetitors" class="stat-number"></p>
+            </div>
+          </div>
+
+          <div class="card card--gradient-peach">
+            <div class="card__body flex flex-col gap-8 items-center">
+              <h3>Total Changes</h3>
+              <p id="totalChanges" class="stat-number"></p>
+            </div>
+          </div>
+
+          <div class="card card--gradient-pink">
+            <div class="card__body flex flex-col gap-8 items-center">
+              <h3>Changes Today</h3>
+              <p id="changesToday" class="stat-number"></p>
+            </div>
+          </div>
+
+          <div class="card card--gradient-blue">
+            <div class="card__body" id="systemStatus">
+              <!-- System status will be injected -->
+            </div>
+          </div>
+
+          <div class="card card--gradient-yellow">
+            <div class="card__body flex flex-col gap-8 items-center">
+              <h3>System Uptime</h3>
+              <p id="systemUptime" class="stat-number"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Changes Preview -->
+        <div class="card mt-8">
+          <div class="card__body">
+            <h3 class="mb-8">Recent Activity</h3>
+            <div id="recentActivity" class="flex flex-col gap-8"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Competitors Page -->
+      <section id="competitors" class="page hidden">
+        <h2 class="mb-8">Competitors</h2>
+        <div class="card">
+          <div class="card__body">
+            <table class="competitor-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>URL</th>
+                  <th>Status</th>
+                  <th>Last Check</th>
+                  <th>Changes</th>
+                  <th>Health</th>
+                </tr>
+              </thead>
+              <tbody id="competitorTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Changes Page -->
+      <section id="changes" class="page hidden">
+        <h2 class="mb-8">Recent Changes</h2>
+        <div id="changesTimeline" class="flex flex-col gap-16"></div>
+      </section>
+
+      <!-- Analytics Page -->
+      <section id="analytics" class="page hidden">
+        <h2 class="mb-8">Analytics</h2>
+        
+        <!-- Changes per Day Chart -->
+        <div class="card mb-8">
+          <div class="card__body">
+            <h3 class="mb-8">Changes per Day (Last 7 Days)</h3>
+            <div style="height:300px;">
+              <canvas id="changesPerDayChart" height="300"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid dashboard-grid gap-16">
+          <!-- Changes by Competitor Chart -->
+          <div class="card">
+            <div class="card__body">
+              <h3 class="mb-8">Changes by Competitor</h3>
+              <div style="height:250px;">
+                <canvas id="changesByCompetitorChart" height="250"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Changes by Type Chart -->
+          <div class="card">
+            <div class="card__body">
+              <h3 class="mb-8">Changes by Type</h3>
+              <div style="height:250px;">
+                <canvas id="changesByTypeChart" height="250"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Page -->
+      <section id="settings" class="page hidden">
+        <h2 class="mb-8">Settings</h2>
+        <div class="card">
+          <div class="card__body">
+            <div class="form-group">
+              <label class="form-label">Monitoring Interval (minutes)</label>
+              <input type="number" class="form-control" id="monitoringInterval" min="1" max="1440">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" id="notificationEnabled"> Enable Notifications
+              </label>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Slack Webhook URL</label>
+              <input type="url" class="form-control" id="slackWebhook" placeholder="https://hooks.slack.com/services/...">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Groq API Key</label>
+              <input type="password" class="form-control" id="groqApiKey" placeholder="gsk_...">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Max Changes per Scan</label>
+              <input type="number" class="form-control" id="maxChanges" min="1" max="1000">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">
+                <input type="checkbox" id="enableSummaries"> Enable AI Summaries
+              </label>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Timezone</label>
+              <select class="form-control" id="timezone">
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">Eastern Time</option>
+                <option value="America/Chicago">Central Time</option>
+                <option value="America/Denver">Mountain Time</option>
+                <option value="America/Los_Angeles">Pacific Time</option>
+              </select>
+            </div>
+            
+            <button class="btn btn--primary" onclick="saveSettings()">Save Settings</button>
+            
+            <div class="status status--info mt-8">Pastel theme is always on ✨</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
