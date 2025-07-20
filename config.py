@@ -1,7 +1,11 @@
 # Add your competitors and APIs here
 COMPETITORS = [
-    {"name": "Acme", "changelog": "https://acme.com/changelog"},
+    {
+        "name": "GitHub",
+        "changelog": "https://github.blog/changelog/"
+    }
 ]
+
 
 # These will come from environment variables set in GitHub Secrets
 import os
