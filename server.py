@@ -150,23 +150,19 @@ def get_changes():
     """Get recent changes with optional filtering"""
     competitor_filter = request.args.get("competitor")
     days = int(request.args.get("days", 7))
-
-    now = datetime.now(timezone.utc)  # make aware
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
-    changes = [c for c in changes if _parse_iso(c["timestamp"]) > cutoff_date]
-
-
+    
+    all_changes = MOCK_DATA["recent_changes"]  # avoid reassigning 'changes'
+    
     # Filter by competitor if specified
     if competitor_filter:
-        changes = [c for c in changes if c["competitor"] == competitor_filter]
-
+        all_changes = [c for c in all_changes if c["competitor"] == competitor_filter]
+    
     # Filter by date
-    changes = [
-        c for c in changes
-        if datetime.fromisoformat(c["timestamp"].replace('Z', '+00:00')) > cutoff_date
-    ]
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    all_changes = [c for c in all_changes if _parse_iso(c["timestamp"]) > cutoff_date]
+    
+    return jsonify({"changes": all_changes})
 
-    return jsonify({"changes": changes})
 
 
 @app.route("/api/run-monitor", methods=["POST"])
