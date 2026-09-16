@@ -5,8 +5,8 @@ from app import config
 from app.monitor.scraper import fetch_changelog
 from app.monitor.diff import compute_diff
 from app.storage.snapshots import load_snapshot, save_snapshot
-from summarizer import summarize_all
-from reporter import send_slack
+from app.notifications.summarizer import summarize_all
+from app.notifications.slack import send_slack
 
 
 class MonitorService:
