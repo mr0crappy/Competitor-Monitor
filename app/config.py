@@ -12,18 +12,18 @@ import os
 # Small-scale OSS & indie apps (safe defaults; edit freely)
 COMPETITORS = [
     # Small / indie OSS
-    {"name": "Plausible Analytics", "changelog": "https://plausible.io/changelog"},
-    {"name": "Ackee",               "changelog": "https://github.com/electerious/Ackee/releases"},
-    {"name": "Cal.com",             "changelog": "https://cal.com/changelog"},
-    {"name": "Umami Analytics",     "changelog": "https://umami.is/changelog"},
-    {"name": "Directus",            "changelog": "https://directus.io/releases"},
+    {"id": "plausible", "name": "Plausible Analytics", "changelog": "https://plausible.io/changelog"},
+    {"id": "ackee","name": "Ackee",               "changelog": "https://github.com/electerious/Ackee/releases"},
+    {"id": "cal","name": "Cal.com",             "changelog": "https://cal.com/changelog"},
+    {"id": "umami","name": "Umami Analytics",     "changelog": "https://umami.is/changelog"},
+    {"id": "directus","name": "Directus",            "changelog": "https://directus.io/releases"},
 
     # Indie SaaS / productivity
-    {"name": "Height",              "changelog": "https://height.app/changelog"},
-    {"name": "Tability",            "changelog": "https://tability.io/changelog"},
-    {"name": "Cron",                "changelog": "https://cron.com/changelog"},
-    {"name": "Reflect Notes",       "changelog": "https://reflect.app/changelog"},
-    {"name": "Superlist",           "changelog": "https://superlist.com/changelog"},
+    {"id": "height","name": "Height",              "changelog": "https://height.app/changelog"},
+    {"id": "tability","name": "Tability",            "changelog": "https://tability.io/changelog"},
+    {"id": "cron","name": "Cron",                "changelog": "https://cron.com/changelog"},
+    {"id": "reflect","name": "Reflect Notes",       "changelog": "https://reflect.app/changelog"},
+    {"id": "superlist","name": "Superlist",           "changelog": "https://superlist.com/changelog"},
 ]
 
 # --- NSFW filtering ---------------------------------------------------------
