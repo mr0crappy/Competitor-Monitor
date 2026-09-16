@@ -5,14 +5,14 @@ from app import config
 from app.monitor.scraper import fetch_changelog
 from app.monitor.diff import compute_diff
 from app.storage.snapshots import load_snapshot, save_snapshot
-from app.notifications.summarizer import summarize_all
-from app.notifications.discord import send_discord
+from app.notifications.service import NotificationService
 
 
 class MonitorService:
 
     def __init__(self):
         self.competitors = config.COMPETITORS
+        self.notification_service = NotificationService()
 
     def is_nsfw_url(self, url: str) -> bool:
         host = urlparse(url).netloc.lower()
@@ -91,17 +91,6 @@ class MonitorService:
                     f"{name}: {error}"
                 )
 
-        if all_changes or config.ALWAYS_NOTIFY:
-            summary = summarize_all(all_changes)
-
-            if config.DISCORD_WEBHOOK:
-                send_discord(
-                    summary,
-                    config.DISCORD_WEBHOOK
-                )
-            else:
-                print(
-                    "[WARN] No Discord webhook configured"
-                )
+        self.notification_service.notify(all_changes)
 
         return all_changes
