@@ -47,7 +47,7 @@ from datetime import datetime, timedelta, timezone
 import schedule
 
 # Backend imports
-import config
+from app import config
 from main import run  # run(return_changes: bool=False) -> Optional[dict]
 from summarizer import summarize_all
 from reporter import send_slack  # send_slack(text, webhook_url)

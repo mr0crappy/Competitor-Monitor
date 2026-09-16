@@ -6,7 +6,13 @@ Keep this file *import-safe*: do not import app modules here (scraper, main, etc
 to avoid circular imports. Only import stdlib + os.
 """
 
+
+from dotenv import load_dotenv
 import os
+
+load_dotenv()
+
+
 
 # --- Competitors ------------------------------------------------------------
 # Small-scale OSS & indie apps (safe defaults; edit freely)
@@ -38,5 +44,5 @@ ALWAYS_NOTIFY = True               # send Slack even if no changes (good for tes
 MAX_LINES_PER_COMPETITOR = 50      # safety trim before diffing
 
 # --- Secrets via env --------------------------------------------------------
-SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK")
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY")

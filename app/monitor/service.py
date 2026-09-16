@@ -6,7 +6,7 @@ from app.monitor.scraper import fetch_changelog
 from app.monitor.diff import compute_diff
 from app.storage.snapshots import load_snapshot, save_snapshot
 from app.notifications.summarizer import summarize_all
-from app.notifications.slack import send_slack
+from app.notifications.discord import send_discord
 
 
 class MonitorService:
@@ -94,14 +94,14 @@ class MonitorService:
         if all_changes or config.ALWAYS_NOTIFY:
             summary = summarize_all(all_changes)
 
-            if config.SLACK_WEBHOOK:
-                send_slack(
+            if config.DISCORD_WEBHOOK:
+                send_discord(
                     summary,
-                    config.SLACK_WEBHOOK
+                    config.DISCORD_WEBHOOK
                 )
             else:
                 print(
-                    "[WARN] No Slack webhook configured"
+                    "[WARN] No Discord webhook configured"
                 )
 
         return all_changes
