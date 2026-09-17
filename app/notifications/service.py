@@ -6,7 +6,8 @@ from app.notifications.discord import send_discord
 class NotificationService:
 
     def notify(self, changes):
-        if not changes and not config.ALWAYS_NOTIFY:
+        if not changes:
+            print("[INFO] No changes detected. Skipping notification.")
             return False
 
         summary = summarize_all(changes)

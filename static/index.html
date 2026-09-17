@@ -1,299 +1,448 @@
 <!DOCTYPE html>
 <html lang="en" data-color-scheme="dark">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Competitor Monitor Dashboard</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Track competitor changelogs and get notified when they ship.">
+
+  <title>Competitor Monitor</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Pinned: an unpinned major bump silently breaks the chart config. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+
+  <style>
+    /* Button spinner used by setLoading() in app.js */
+    .spinner {
+      animation: spin 1s linear infinite;
+      vertical-align: -3px;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation-duration: 3s; }
+    }
+  </style>
 </head>
+
 <body>
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar__header">
-            <h2 class="sidebar__title">Monitor Dashboard</h2>
-            <button class="sidebar__toggle" id="sidebarToggle" aria-label="Toggle sidebar">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-        <nav class="sidebar__nav">
-            <ul class="nav-list">
-                <li class="nav-item">
-                    <button class="nav-link active" data-section="dashboard">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-                        </svg>
-                        Dashboard
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-section="competitors">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M16 4c4.42 0 8 3.58 8 8s-3.58 8-8 8-8-3.58-8-8 3.58-8 8-8m0-2C9.37 2 4 7.37 4 14s5.37 12 12 12 12-5.37 12-12S22.63 2 16 2z"/>
-                        </svg>
-                        Competitors
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-section="changes">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                        </svg>
-                        Changes
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-section="analytics">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
-                        </svg>
-                        Analytics
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-section="settings">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
-                        </svg>
-                        Settings
-                    </button>
-                </li>
-            </ul>
-        </nav>
-    </aside>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Top Header -->
-        <header class="header">
-            <div class="header__left">
-                <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-                <h1 class="page-title" id="pageTitle">Dashboard Overview</h1>
-            </div>
-            <div class="header__right">
-                <div class="status-indicator" id="systemStatus">
-                    <span class="status-dot status--success"></span>
-                    <span class="status-text">System Running</span>
-                </div>
-                <button class="btn btn--primary btn--sm" id="manualTrigger">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-                    </svg>
-                    Run Monitor
-                </button>
-            </div>
-        </header>
+  <a class="skip-link" href="#contentArea">Skip to content</a>
 
-        <!-- Content Area -->
-        <div class="content" id="contentArea">
-            <!-- Dashboard Overview Section -->
-            <section class="section dashboard-section active" id="dashboard">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-card__icon stat-card__icon--primary">
-                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M16 4c4.42 0 8 3.58 8 8s-3.58 8-8 8-8-3.58-8-8 3.58-8 8-8z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-card__content">
-                            <h3 class="stat-card__title">Total Competitors</h3>
-                            <p class="stat-card__value" id="totalCompetitors">3</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card__icon stat-card__icon--success">
-                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-card__content">
-                            <h3 class="stat-card__title">Recent Changes (24h)</h3>
-                            <p class="stat-card__value" id="recentChanges">5</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card__icon stat-card__icon--warning">
-                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-card__content">
-                            <h3 class="stat-card__title">System Status</h3>
-                            <p class="stat-card__value">Running</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card__icon stat-card__icon--info">
-                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                            </svg>
-                        </div>
-                        <div class="stat-card__content">
-                            <h3 class="stat-card__title">Last Check</h3>
-                            <p class="stat-card__value" id="lastCheck">15:23 PM</p>
-                        </div>
-                    </div>
-                </div>
+  <!-- ============================================================
+       Sidebar
+       ============================================================ -->
 
-                <div class="dashboard-actions">
-                    <h3>Quick Actions</h3>
-                    <div class="action-buttons">
-                        <button class="btn btn--outline" id="viewAllChanges">View All Changes</button>
-                        <button class="btn btn--outline" id="addCompetitorBtn">Add Competitor</button>
-                    </div>
-                </div>
-            </section>
+  <aside class="sidebar" id="sidebar">
 
-            <!-- Competitors Section -->
-            <section class="section competitors-section" id="competitors">
-                <div class="section-header">
-                    <div class="section-header__left">
-                        <h2>Competitors</h2>
-                        <button class="btn btn--primary" id="addCompetitorModal">Add Competitor</button>
-                    </div>
-                    <div class="section-header__right">
-                        <input type="text" class="form-control search-input" placeholder="Search competitors..." id="competitorSearch">
-                    </div>
-                </div>
-                <div class="competitors-grid" id="competitorsGrid">
-                    <!-- Competitor cards will be populated by JavaScript -->
-                </div>
-            </section>
-
-            <!-- Changes Section -->
-            <section class="section changes-section" id="changes">
-                <div class="section-header">
-                    <div class="section-header__left">
-                        <h2>Change History</h2>
-                    </div>
-                    <div class="section-header__right">
-                        <select class="form-control" id="competitorFilter">
-                            <option value="">All Competitors</option>
-                        </select>
-                        <input type="date" class="form-control" id="dateFilter">
-                    </div>
-                </div>
-                <div class="changes-list" id="changesList">
-                    <!-- Changes will be populated by JavaScript -->
-                </div>
-            </section>
-
-            <!-- Analytics Section -->
-            <section class="section analytics-section" id="analytics">
-                <div class="analytics-grid">
-                    <div class="card">
-                        <div class="card__body">
-                            <h3>Activity Timeline (Last 7 Days)</h3>
-                            <canvas id="activityChart" width="400" height="200"></canvas>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card__body">
-                            <h3>Top Active Competitors</h3>
-                            <div class="competitor-ranking" id="competitorRanking">
-                                <!-- Rankings will be populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Settings Section -->
-            <section class="section settings-section" id="settings">
-                <div class="settings-grid">
-                    <div class="card">
-                        <div class="card__body">
-                            <h3>API Configuration</h3>
-                            <form id="apiSettingsForm">
-                                <div class="form-group">
-                                    <label class="form-label" for="slackWebhook">Slack Webhook URL</label>
-                                    <input type="url" class="form-control" id="slackWebhook" placeholder="https://hooks.slack.com/services/...">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="groqApiKey">Groq API Key</label>
-                                    <input type="password" class="form-control" id="groqApiKey" placeholder="Enter your Groq API key">
-                                </div>
-                                <button type="submit" class="btn btn--primary">Save API Settings</button>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card__body">
-                            <h3>Notification Preferences</h3>
-                            <form id="notificationSettingsForm">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" id="notificationsEnabled" checked>
-                                        Enable Notifications
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="checkFrequency">Check Frequency (minutes)</label>
-                                    <select class="form-control" id="checkFrequency">
-                                        <option value="15">15 minutes</option>
-                                        <option value="30">30 minutes</option>
-                                        <option value="60" selected>1 hour</option>
-                                        <option value="120">2 hours</option>
-                                        <option value="240">4 hours</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="btn btn--primary">Save Preferences</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
-
-    <!-- Modal for Add/Edit Competitor -->
-    <div class="modal-overlay" id="competitorModalOverlay">
-        <div class="modal">
-            <div class="modal__header">
-                <h3 id="competitorModalTitle">Add Competitor</h3>
-                <button class="modal__close" id="competitorModalClose">&times;</button>
-            </div>
-            <div class="modal__body">
-                <form id="competitorForm">
-                    <div class="form-group">
-                        <label class="form-label" for="competitorName">Company Name</label>
-                        <input type="text" class="form-control" id="competitorName" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="competitorUrl">URL</label>
-                        <input type="url" class="form-control" id="competitorUrl" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">
-                            <input type="checkbox" id="competitorStatus" checked>
-                            Active
-                        </label>
-                    </div>
-                    <div class="modal__actions">
-                        <button type="button" class="btn btn--outline" id="cancelCompetitor">Cancel</button>
-                        <button type="submit" class="btn btn--primary">Save Competitor</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <div class="sidebar__header">
+      <h2 class="sidebar__title">Competitor Monitor</h2>
     </div>
 
-    <!-- Toast Notification -->
-    <div class="toast" id="toast">
-        <div class="toast__content">
-            <span class="toast__message" id="toastMessage">Action completed successfully!</span>
-            <button class="toast__close" id="toastClose">&times;</button>
+    <nav class="sidebar__nav" aria-label="Sections">
+      <ul class="nav-list">
+
+        <li class="nav-item">
+          <button type="button" class="nav-link active" data-section="dashboard" aria-current="page">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+            </svg>
+            Dashboard
+          </button>
+        </li>
+
+        <li class="nav-item">
+          <button type="button" class="nav-link" data-section="competitors">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" />
+            </svg>
+            Competitors
+          </button>
+        </li>
+
+        <li class="nav-item">
+          <button type="button" class="nav-link" data-section="changes">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+            </svg>
+            Changes
+          </button>
+        </li>
+
+        <li class="nav-item">
+          <button type="button" class="nav-link" data-section="analytics">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" />
+            </svg>
+            Analytics
+          </button>
+        </li>
+
+        <li class="nav-item">
+          <button type="button" class="nav-link" data-section="settings">
+            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.48.48 0 0 0 .12-.61l-1.92-3.32a.48.48 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.48.48 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
+            </svg>
+            Settings
+          </button>
+        </li>
+
+      </ul>
+    </nav>
+
+  </aside>
+
+  <!-- ============================================================
+       Main
+       ============================================================ -->
+
+  <main class="main-content">
+
+    <header class="header">
+
+      <div class="header__left">
+
+        <button type="button" class="mobile-menu-toggle" id="mobileMenuToggle"
+                aria-controls="sidebar" aria-label="Open navigation">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <h1 class="page-title" id="pageTitle">Dashboard overview</h1>
+
+      </div>
+
+      <div class="header__right">
+
+        <div class="status-indicator" id="systemStatus" aria-live="polite">
+          <span class="status-dot"></span>
+          <span class="status-text">Idle</span>
         </div>
+
+        <button type="button" class="btn btn--primary btn--sm" id="manualTrigger">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+          </svg>
+          Run monitor
+        </button>
+
+      </div>
+
+    </header>
+
+    <div class="content" id="contentArea">
+
+      <!-- ==================== Dashboard ==================== -->
+
+      <section class="section dashboard-section active" id="dashboard" aria-labelledby="pageTitle">
+
+        <div class="stats-grid">
+
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--primary">
+              <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" />
+              </svg>
+            </div>
+            <div class="stat-card__content">
+              <h3 class="stat-card__title">Competitors tracked</h3>
+              <p class="stat-card__value" id="totalCompetitors">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--success">
+              <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+              </svg>
+            </div>
+            <div class="stat-card__content">
+              <h3 class="stat-card__title">Actively monitored</h3>
+              <p class="stat-card__value" id="activeCompetitors">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--warning">
+              <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              </svg>
+            </div>
+            <div class="stat-card__content">
+              <h3 class="stat-card__title">Changes in last 24h</h3>
+              <p class="stat-card__value" id="recentChanges">0</p>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--info">
+              <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              </svg>
+            </div>
+            <div class="stat-card__content">
+              <h3 class="stat-card__title">Last check</h3>
+              <p class="stat-card__value" id="lastCheck">—</p>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="dashboard-actions">
+          <h3>Quick actions</h3>
+          <div class="action-buttons">
+            <button type="button" class="btn btn--outline" id="viewAllChanges">View all changes</button>
+            <button type="button" class="btn btn--outline" id="addCompetitorBtn">Add competitor</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ==================== Competitors ==================== -->
+
+      <section class="section competitors-section" id="competitors" aria-label="Competitors">
+
+        <div class="section-header">
+
+          <div class="section-header__left">
+            <h2>Competitors</h2>
+            <button type="button" class="btn btn--primary" id="addCompetitorModal">Add competitor</button>
+          </div>
+
+          <div class="section-header__right">
+            <label class="sr-only" for="competitorSearch">Search competitors</label>
+            <input type="search" class="form-control search-input" id="competitorSearch"
+                   placeholder="Search by name or URL" autocomplete="off">
+          </div>
+
+        </div>
+
+        <!-- Cards rendered by renderCompetitors() -->
+        <div class="competitors-grid" id="competitorsGrid" aria-live="polite"></div>
+
+      </section>
+
+      <!-- ==================== Changes ==================== -->
+
+      <section class="section changes-section" id="changes" aria-label="Change history">
+
+        <div class="section-header">
+
+          <div class="section-header__left">
+            <h2>Change history</h2>
+          </div>
+
+          <div class="section-header__right">
+            <label class="sr-only" for="competitorFilter">Filter by competitor</label>
+            <select class="form-control" id="competitorFilter">
+              <option value="">All competitors</option>
+            </select>
+
+            <label class="sr-only" for="dateFilter">Filter by date</label>
+            <input type="date" class="form-control" id="dateFilter">
+          </div>
+
+        </div>
+
+        <!-- Entries rendered by renderChanges() -->
+        <div class="changes-list" id="changesList" aria-live="polite"></div>
+
+      </section>
+
+      <!-- ==================== Analytics ==================== -->
+
+      <section class="section analytics-section" id="analytics" aria-label="Analytics">
+
+        <div class="analytics-grid">
+
+          <div class="card">
+            <div class="card__body">
+              <h3>Activity over the last 7 days</h3>
+              <div class="chart-wrap">
+                <canvas id="activityChart" role="img"
+                        aria-label="Line chart of detected changes per day"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__body">
+              <h3>Most active competitors</h3>
+              <!-- Rows rendered by renderCompetitorRanking() -->
+              <div class="competitor-ranking" id="competitorRanking"></div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ==================== Settings ==================== -->
+
+      <section class="section settings-section" id="settings" aria-label="Settings">
+
+        <div class="settings-grid">
+
+          <div class="card">
+            <div class="card__body">
+
+              <h3>Connections</h3>
+
+              <form id="apiSettingsForm" novalidate>
+
+                <div class="form-group">
+                  <label class="form-label" for="discordWebhook">Discord webhook URL</label>
+                  <input type="url" class="form-control" id="discordWebhook"
+                         placeholder="https://discord.com/api/webhooks/…" autocomplete="off">
+                  <p class="form-hint">Change alerts are posted to this channel.</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="groqApiKey">Groq API key</label>
+                  <input type="password" class="form-control" id="groqApiKey"
+                         placeholder="Enter your Groq API key" autocomplete="off"
+                         spellcheck="false" aria-describedby="groqApiKeyHint">
+                  <p class="form-hint" id="groqApiKeyHint">
+                    Used to summarize detected changes. The saved key is never sent back to the
+                    browser — leave this blank to keep it.
+                  </p>
+                </div>
+
+                <button type="submit" class="btn btn--primary">Save connections</button>
+
+              </form>
+
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__body">
+
+              <h3>Notifications</h3>
+
+              <form id="notificationSettingsForm" novalidate>
+
+                <div class="form-group">
+                  <label class="form-label form-label--inline" for="notificationsEnabled">
+                    <input type="checkbox" id="notificationsEnabled" checked>
+                    Send alerts when a change is detected
+                  </label>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="checkFrequency">Check every</label>
+                  <select class="form-control" id="checkFrequency">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                  </select>
+                </div>
+
+                <button type="submit" class="btn btn--primary">Save notifications</button>
+
+              </form>
+
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js"></script>
+  </main>
+
+  <!-- ============================================================
+       Add / edit competitor modal
+       ============================================================ -->
+
+  <div class="modal-overlay" id="competitorModalOverlay">
+
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="competitorModalTitle">
+
+      <div class="modal__header">
+        <h3 id="competitorModalTitle">Add competitor</h3>
+        <button type="button" class="modal__close" id="competitorModalClose" aria-label="Close">
+          &times;
+        </button>
+      </div>
+
+      <div class="modal__body">
+
+        <form id="competitorForm" novalidate>
+
+          <div class="form-group">
+            <label class="form-label" for="competitorName">Company name</label>
+            <input type="text" class="form-control" id="competitorName"
+                   placeholder="e.g. Plausible Analytics" autocomplete="off" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="competitorUrl">Changelog URL</label>
+            <input type="url" class="form-control" id="competitorUrl"
+                   placeholder="https://example.com/changelog" autocomplete="off" required>
+            <p class="form-hint">The page to watch for updates.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="competitorSourceType">Source type</label>
+            <select class="form-control" id="competitorSourceType">
+              <option value="generic" selected>Generic page</option>
+              <option value="github">GitHub releases</option>
+              <option value="calcom">Cal.com</option>
+              <option value="superlist">Superlist</option>
+            </select>
+            <p class="form-hint">Picks the parser used to read the page.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label form-label--inline" for="competitorStatus">
+              <input type="checkbox" id="competitorStatus" checked>
+              Check this competitor on every run
+            </label>
+          </div>
+
+          <div class="modal__actions">
+            <button type="button" class="btn btn--outline" id="cancelCompetitor">Cancel</button>
+            <button type="submit" class="btn btn--primary">Save competitor</button>
+          </div>
+
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       Toast
+       ============================================================ -->
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <div class="toast__content">
+      <span class="toast__message" id="toastMessage"></span>
+      <button type="button" class="toast__close" id="toastClose" aria-label="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <noscript>
+    <p class="noscript-notice">
+      This dashboard needs JavaScript to load competitor data. Enable it and reload the page.
+    </p>
+  </noscript>
+
 </body>
+
 </html>

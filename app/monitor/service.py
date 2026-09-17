@@ -7,6 +7,7 @@ from app.monitor.diff import compute_diff
 from app.storage.snapshots import load_snapshot, save_snapshot
 from app.notifications.service import NotificationService
 from app.storage.competitors import CompetitorStore
+from app.monitor.normalizer import normalize_changelog
 
 
 class MonitorService:
@@ -42,6 +43,7 @@ class MonitorService:
 
     def check_competitor(self, competitor):
         name = competitor["name"]
+        competitor_id = competitor["id"]
         url = competitor["changelog"]
 
         print(f"[INFO] Checking {name}: {url}")
@@ -52,12 +54,69 @@ class MonitorService:
             print(f"[WARN] Could not fetch {name}")
             return None
 
-        old = load_snapshot(competitor["id"])
-        new = raw.splitlines()
+        snapshot_key = self.competitor_store.get_snapshot_key(competitor_id)
+
+        if snapshot_key is None:
+            return []
+
+        snapshot = load_snapshot(snapshot_key)
+
+        if snapshot is None:
+            print(
+                f"[INFO] No snapshot found for {name}. "
+                "Creating baseline."
+            )
+
+            new = normalize_changelog(
+                raw,
+                url,
+                competitor.get("source_type", "generic")
+            )
+
+            save_snapshot(
+                snapshot_key,
+                url,
+                new
+            )
+
+            return []
+
+        elif snapshot["url"] != url:
+            print(
+            f"[INFO] URL changed for {name}. "
+            "Creating a new baseline."
+            )
+
+            new = normalize_changelog(
+                raw,
+                url,
+                competitor.get("source_type", "generic")
+            )
+
+            save_snapshot(
+                snapshot_key,
+                url,
+                new
+            )
+
+            return []
+
+        else:
+            old = snapshot["data"]
+
+        new = normalize_changelog(
+            raw,
+            url,
+            competitor.get("source_type", "generic")
+        )
 
         diff = compute_diff(old, new)
 
-        save_snapshot(competitor["id"], new)
+        save_snapshot(
+            snapshot_key,
+            url,
+            new
+        )
 
         return diff
 

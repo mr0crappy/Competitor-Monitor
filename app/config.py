@@ -16,21 +16,7 @@ load_dotenv()
 
 # --- Competitors ------------------------------------------------------------
 # Small-scale OSS & indie apps (safe defaults; edit freely)
-COMPETITORS = [
-    # Small / indie OSS
-    {"id": "plausible", "name": "Plausible Analytics", "changelog": "https://plausible.io/changelog"},
-    {"id": "ackee","name": "Ackee",               "changelog": "https://github.com/electerious/Ackee/releases"},
-    {"id": "cal","name": "Cal.com",             "changelog": "https://cal.com/changelog"},
-    {"id": "umami","name": "Umami Analytics",     "changelog": "https://umami.is/changelog"},
-    {"id": "directus","name": "Directus",            "changelog": "https://directus.io/releases"},
-
-    # Indie SaaS / productivity
-    {"id": "height","name": "Height",              "changelog": "https://height.app/changelog"},
-    {"id": "tability","name": "Tability",            "changelog": "https://tability.io/changelog"},
-    {"id": "cron","name": "Cron",                "changelog": "https://cron.com/changelog"},
-    {"id": "reflect","name": "Reflect Notes",       "changelog": "https://reflect.app/changelog"},
-    {"id": "superlist","name": "Superlist",           "changelog": "https://superlist.com/changelog"},
-]
+COMPETITORS = []
 
 # --- NSFW filtering ---------------------------------------------------------
 # Simple substring match against domain. Extend as needed.
@@ -46,3 +32,8 @@ MAX_LINES_PER_COMPETITOR = 50      # safety trim before diffing
 # --- Secrets via env --------------------------------------------------------
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY")
+
+GROQ_MODEL = os.getenv(
+    "GROQ_MODEL",
+    "openai/gpt-oss-120b",
+)

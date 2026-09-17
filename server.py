@@ -48,8 +48,9 @@ import schedule
 
 # Backend imports
 from app import config
-from main import run  # run(return_changes: bool=False) -> Optional[dict]
+from app.monitor.service import MonitorService
 from app.storage.competitors import CompetitorStore
+from app.web.routes import api, init_routes
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -191,7 +192,16 @@ def _purge_competitor_history(
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__, static_folder=STATIC_DIR, template_folder=TEMPLATE_DIR)
+
 competitor_store = CompetitorStore()
+
+init_routes(
+    competitor_store,
+    MOCK_DATA,
+)
+
+app.register_blueprint(api)
+
 
 CORS(app)
 
@@ -217,220 +227,13 @@ def serve_static(path: str):
         return send_from_directory(TEMPLATE_DIR, path)
     abort(404)
 
-# --------------------------- API: Dashboard --------------------------------
 
-@app.route("/api/dashboard", methods=["GET"])
-def get_dashboard():
-    competitors = competitor_store.get_all()
 
-    active_competitors = [
-        c for c in competitors
-        if c["status"] == "active"
-    ]
 
-    now_utc = _utcnow()
 
-    recent_changes_24h = sum(
-        1
-        for c in MOCK_DATA["recent_changes"]
-        if _parse_iso(c.get("timestamp")) >
-        now_utc - timedelta(hours=24)
-    )
 
-    return jsonify({
-        "totalCompetitors": len(competitors),
-        "activeCompetitors": len(active_competitors),
-        "recentChanges24h": recent_changes_24h,
-        "systemStatus": MOCK_DATA["monitoring_status"],
-        "recentActivity": MOCK_DATA["recent_changes"][-10:],
-    })
 
-# --------------------------- API: Competitors ------------------------------
 
-@app.route("/api/competitors", methods=["GET"])
-def api_get_competitors():
-    return jsonify({
-        "competitors": competitor_store.get_all()
-    })
-
-@app.route("/api/competitors", methods=["POST"])
-def api_add_competitor():
-    data = request.get_json(force=True, silent=True) or {}
-    name = (data.get("name") or "").strip()
-    url = (data.get("changelog") or data.get("url") or "").strip()
-
-    if not name or not url:
-        return jsonify({"error": "name and changelog URL required"}), 400
-
-    if _is_nsfw_url(url):
-        return jsonify({"error": "URL blocked by NSFW policy"}), 400
-
-    
-
-    new_comp = competitor_store.add(
-        name,
-        url,
-    )
-    
-    return jsonify({"success": True, "competitor": new_comp})
-
-@app.route("/api/competitors/<int:competitor_id>", methods=["PUT"])
-def api_update_competitor(competitor_id: int):
-    data = request.get_json(force=True, silent=True) or {}
-    comp = competitor_store.get_by_id(competitor_id)
-    if not comp:
-        return jsonify({"error": "Competitor not found"}), 404
-
-    new_name = data.get("name", comp["name"]).strip()
-    new_url = data.get("changelog", comp["changelog"]).strip()
-
-    if _is_nsfw_url(new_url):
-        return jsonify({"error": "URL blocked by NSFW policy"}), 400
-
-    updated = competitor_store.update(
-        competitor_id,
-        new_name,
-        new_url,
-        data.get("description", comp.get("description", "")),
-        data.get("status", comp.get("status", "active")),
-    )
-
-    
-
-    return jsonify({"success": True, "competitor": updated})
-
-@app.route("/api/competitors/<int:competitor_id>", methods=["DELETE"])
-def api_delete_competitor(competitor_id: int):
-    comp = competitor_store.get_by_id(competitor_id)
-    if not comp:
-        return jsonify({"error": "Competitor not found"}), 404
-
-    name = comp["name"]
-
-    # remove from in-memory list
-    removed = competitor_store.delete(competitor_id)
-    
-
-    # purge history + snapshot
-    removed_changes = _purge_competitor_history(
-    competitor_id,
-    name,
-)
-
-    
-
-    return jsonify({"success": True, "removed_changes": removed_changes})
-
-# --------------------------- API: Changes ----------------------------------
-
-@app.route("/api/changes", methods=["GET"])
-def api_get_changes():
-    competitor_filter = request.args.get("competitor")
-    days = request.args.get("days", 7)
-
-    try:
-        days = int(days)
-    except Exception:
-        days = 7
-
-    out = MOCK_DATA["recent_changes"]
-    if competitor_filter:
-        out = [c for c in out if c["competitor"] == competitor_filter]
-
-    cutoff = _utcnow() - timedelta(days=days)
-    out = [c for c in out if _parse_iso(c.get("timestamp")) > cutoff]
-
-    return jsonify({"changes": out})
-
-# --------------------------- API: Run Monitor ------------------------------
-
-@app.route("/api/run-monitor", methods=["POST"])
-def api_run_monitor():
-    """Manual trigger: run scrape/diff/summarize; push Discord; cache results."""
-    status = MOCK_DATA["monitoring_status"]
-    if status["isRunning"]:
-        return jsonify({"error": "Monitor already running"}), 409
-
-    status["isRunning"] = True
-    status["totalRuns"] += 1
-
-    try:
-        changes = run(return_changes=True) or {}
-    except Exception as e:
-        status["isRunning"] = False
-        status["failedRuns"] += 1
-        return jsonify({"error": f"Monitor failed: {e}"}), 500
-
-    summary = (
-        "Changes detected."
-        if changes
-        else "No new changes detected."
-    )
-
-    # Cache change events for dashboard
-    for competitor_name, change_list in (changes or {}).items():
-        for line in change_list:
-            MOCK_DATA["recent_changes"].append(
-                _make_change_event(competitor_name, line, line, "manual")
-            )
-
-    status["isRunning"] = False
-    status["lastRun"] = _utcnow_iso()
-    status["nextRun"] = (_utcnow() + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
-
-    # prune
-    MOCK_DATA["recent_changes"] = MOCK_DATA["recent_changes"][-100:]
-
-    return jsonify({
-        "success": True,
-        "summary": summary,
-        "changes": changes,
-        "message": f"Found changes for {len(changes)} competitors" if changes else "No changes detected",
-    })
-
-# --------------------------- API: Status -----------------------------------
-
-@app.route("/api/status", methods=["GET"])
-def api_status():
-    return jsonify({"status": MOCK_DATA["monitoring_status"]})
-
-# --------------------------- API: Analytics --------------------------------
-
-@app.route("/api/analytics", methods=["GET"])
-def api_analytics():
-    # last 7 days simple counts
-    today = _utcnow().date()
-    weekly_activity: List[Dict[str, Any]] = []
-    for i in range(6, -1, -1):  # oldest -> newest
-        d = today - timedelta(days=i)
-        count = sum(1 for c in MOCK_DATA["recent_changes"]
-                    if _parse_iso(c.get("timestamp")).date() == d)
-        weekly_activity.append({"date": d.isoformat(), "changes": count})
-
-    # competitor counts
-    comp_counts: Dict[str, int] = {}
-    for c in MOCK_DATA["recent_changes"]:
-        comp_counts[c["competitor"]] = comp_counts.get(c["competitor"], 0) + 1
-    competitor_activity = [{"competitor": k, "changes": v} for k, v in comp_counts.items()]
-
-    # naive type buckets by keyword in summary
-    def _count_kwd(k: str) -> int:
-        return sum(1 for c in MOCK_DATA["recent_changes"] if k in c["summary"].lower())
-
-    change_types = [
-        {"type": "feature", "count": _count_kwd("feature")},
-        {"type": "update",  "count": _count_kwd("update")},
-        {"type": "fix",     "count": _count_kwd("fix")},
-    ]
-    total_type = sum(ct["count"] for ct in change_types) or 1
-    for ct in change_types:
-        ct["percentage"] = round(100 * ct["count"] / total_type, 1)
-
-    return jsonify({
-        "weeklyActivity": weekly_activity,
-        "competitorActivity": competitor_activity,
-        "changeTypes": change_types,
-    })
 
 # --------------------------- API: Settings ---------------------------------
 
@@ -450,11 +253,7 @@ def api_post_settings():
     return jsonify({"success": True, "message": "Settings updated (not persisted)."})
 
 
-# --------------------------- Health ----------------------------------------
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok"}), 200
 
 # ---------------------------------------------------------------------------
 # Background Monitoring (Hourly)
@@ -475,7 +274,8 @@ def run_monitoring_job():
     status["totalRuns"] += 1
 
     try:
-        changes = run(return_changes=True) or {}
+        monitor = MonitorService()
+        changes = monitor.run() or {}
 
         if changes:
             status["successfulRuns"] += 1

@@ -1,5 +1,6 @@
 import os
 from groq import Groq
+from app import config
 
 # Defaults (override via env if you want)
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")

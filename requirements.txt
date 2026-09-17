@@ -8,3 +8,4 @@ schedule
 python-dotenv
 gunicorn
 pytest
+lxml

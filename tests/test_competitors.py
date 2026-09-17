@@ -1,13 +1,12 @@
 from app.storage.competitors import CompetitorStore
 
 
-def test_store_seeds_from_config(tmp_path):
+def test_store_starts_empty(tmp_path):
     data_file = tmp_path / "competitors.json"
 
     store = CompetitorStore(data_file)
 
-    assert len(store.get_all()) > 0
-    assert data_file.exists()
+    assert store.get_all() == []
 
 
 def test_add_persists(tmp_path):
