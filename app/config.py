@@ -40,7 +40,7 @@ NSFW_KEYWORDS = ["porn", "adult", "xxx", "sex", "nsfw"]
 NSFW_ALLOWLIST = []  # e.g., ["example.com"]
 
 # --- Behavior flags ---------------------------------------------------------
-ALWAYS_NOTIFY = True               # send Slack even if no changes (good for testing)
+ALWAYS_NOTIFY = True               # send Discord even if no changes (good for testing)
 MAX_LINES_PER_COMPETITOR = 50      # safety trim before diffing
 
 # --- Secrets via env --------------------------------------------------------

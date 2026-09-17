@@ -6,12 +6,13 @@ from app.monitor.scraper import fetch_changelog
 from app.monitor.diff import compute_diff
 from app.storage.snapshots import load_snapshot, save_snapshot
 from app.notifications.service import NotificationService
+from app.storage.competitors import CompetitorStore
 
 
 class MonitorService:
 
     def __init__(self):
-        self.competitors = config.COMPETITORS
+        self.competitor_store = CompetitorStore()
         self.notification_service = NotificationService()
 
     def is_nsfw_url(self, url: str) -> bool:
@@ -30,17 +31,14 @@ class MonitorService:
         )
 
     def get_valid_competitors(self):
-        valid = []
+        competitors = self.competitor_store.get_all()
 
-        for competitor in self.competitors:
-            url = competitor.get("changelog", "")
-
-            if self.is_nsfw_url(url):
-                continue
-
-            valid.append(competitor)
-
-        return valid
+        return [
+            competitor
+            for competitor in competitors
+            if competitor.get("status") == "active"
+            and not self.is_nsfw_url(competitor.get("changelog", ""))
+        ]
 
     def check_competitor(self, competitor):
         name = competitor["name"]

@@ -1,8 +1,8 @@
 """
-Enhanced Flask Server with Slack Integration + UTC-safe timestamps.
+Enhanced Flask Server with Discord Integration + UTC-safe timestamps.
 
 Serves the static dashboard frontend and exposes JSON APIs that wrap the
-Competitor Monitor backend (scrape → diff → summarize → notify Slack).
+Competitor Monitor backend (scrape → diff → summarize → notify Discord).
 
 Intentionally lightweight: in-memory store for dashboard, no DB.
 Snapshots on disk handled by core monitor modules (diff_detector).
@@ -17,7 +17,7 @@ POST /api/competitors         → add
 PUT  /api/competitors/<id>    → update
 DELETE /api/competitors/<id>  → delete (purge history + snapshot)
 GET  /api/changes             → change events (optional ?competitor=&days=)
-POST /api/run-monitor         → run now, push Slack if configured
+POST /api/run-monitor         → run now, push Discord if configured
 GET  /api/status              → current scheduler / last run metadata
 GET  /api/analytics           → simple chart data
 GET  /api/settings            → env + config flags (redacted)
@@ -49,8 +49,7 @@ import schedule
 # Backend imports
 from app import config
 from main import run  # run(return_changes: bool=False) -> Optional[dict]
-from summarizer import summarize_all
-from reporter import send_slack  # send_slack(text, webhook_url)
+from app.storage.competitors import CompetitorStore
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -130,7 +129,7 @@ def _allowed_competitor(c: Dict[str, Any]) -> bool:
 # ---------------------------------------------------------------------------
 
 MOCK_DATA: Dict[str, Any] = {
-    "competitors": [],  # list of {id, name, changelog, ...}
+    
     "recent_changes": [],  # list of change events
     "monitoring_status": {
         "isRunning": False,
@@ -142,30 +141,8 @@ MOCK_DATA: Dict[str, Any] = {
     },
 }
 
-def _load_initial_competitors() -> None:
-    """Seed MOCK_DATA from config.COMPETITORS (NSFW filtered)."""
-    MOCK_DATA["competitors"].clear()
-    for i, comp in enumerate(config.COMPETITORS):
-        if not _allowed_competitor(comp):
-            print(f"[WARN] Skipping NSFW / blocked competitor: {comp.get('name')}")
-            continue
-        MOCK_DATA["competitors"].append({
-            "id": i + 1,
-            "name": comp["name"],
-            "changelog": comp["changelog"],
-            "description": comp.get("description", ""),
-            "status": "active",
-            "lastUpdate": _utcnow_iso(),
-            "changesDetected": 0,
-        })
 
-# run at import
-_load_initial_competitors()
 
-def _reassign_ids() -> None:
-    """Ensure competitor IDs are sequential after deletes."""
-    for new_id, comp in enumerate(MOCK_DATA["competitors"], start=1):
-        comp["id"] = new_id
 
 # ---------------------------------------------------------------------------
 # Change event creation / purge
@@ -182,20 +159,31 @@ def _make_change_event(competitor: str, summary: str, change_line: str,
         "type": event_type,
     }
 
-def _purge_competitor_history(name: str) -> int:
+def _purge_competitor_history(
+    competitor_id: int,
+    name: str,
+) -> int:
     """Remove change events + snapshot file for a competitor. Return count removed."""
     before = len(MOCK_DATA["recent_changes"])
     MOCK_DATA["recent_changes"] = [c for c in MOCK_DATA["recent_changes"] if c["competitor"] != name]
     removed = before - len(MOCK_DATA["recent_changes"])
 
     # remove snapshot file
-    snap_path = os.path.join(DATA_DIR, f"{name}.json")
+    snap_path = os.path.join(
+        DATA_DIR,
+        f"{competitor_id}.json",
+    )
+
     if os.path.exists(snap_path):
         try:
             os.remove(snap_path)
             print(f"[INFO] Deleted snapshot {snap_path}")
-        except Exception as e:
-            print(f"[WARN] Could not delete snapshot {snap_path}: {e}")
+        except OSError as error:
+            print(
+                f"[WARN] Could not delete snapshot "
+                f"{snap_path}: {error}"
+            )
+
     return removed
 
 # ---------------------------------------------------------------------------
@@ -203,6 +191,8 @@ def _purge_competitor_history(name: str) -> int:
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__, static_folder=STATIC_DIR, template_folder=TEMPLATE_DIR)
+competitor_store = CompetitorStore()
+
 CORS(app)
 
 # --------------------------- Static Frontend -------------------------------
@@ -231,14 +221,24 @@ def serve_static(path: str):
 
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
-    active_competitors = [c for c in MOCK_DATA["competitors"] if c["status"] == "active"]
+    competitors = competitor_store.get_all()
+
+    active_competitors = [
+        c for c in competitors
+        if c["status"] == "active"
+    ]
+
     now_utc = _utcnow()
+
     recent_changes_24h = sum(
-        1 for c in MOCK_DATA["recent_changes"]
-        if _parse_iso(c.get("timestamp")) > now_utc - timedelta(hours=24)
+        1
+        for c in MOCK_DATA["recent_changes"]
+        if _parse_iso(c.get("timestamp")) >
+        now_utc - timedelta(hours=24)
     )
+
     return jsonify({
-        "totalCompetitors": len(MOCK_DATA["competitors"]),
+        "totalCompetitors": len(competitors),
         "activeCompetitors": len(active_competitors),
         "recentChanges24h": recent_changes_24h,
         "systemStatus": MOCK_DATA["monitoring_status"],
@@ -249,7 +249,9 @@ def get_dashboard():
 
 @app.route("/api/competitors", methods=["GET"])
 def api_get_competitors():
-    return jsonify({"competitors": MOCK_DATA["competitors"]})
+    return jsonify({
+        "competitors": competitor_store.get_all()
+    })
 
 @app.route("/api/competitors", methods=["POST"])
 def api_add_competitor():
@@ -263,25 +265,19 @@ def api_add_competitor():
     if _is_nsfw_url(url):
         return jsonify({"error": "URL blocked by NSFW policy"}), 400
 
-    # append to config for future runs
-    config.COMPETITORS.append({"name": name, "changelog": url})
+    
 
-    new_comp = {
-        "id": len(MOCK_DATA["competitors"]) + 1,
-        "name": name,
-        "changelog": url,
-        "description": data.get("description", ""),
-        "status": "active",
-        "lastUpdate": _utcnow_iso(),
-        "changesDetected": 0,
-    }
-    MOCK_DATA["competitors"].append(new_comp)
+    new_comp = competitor_store.add(
+        name,
+        url,
+    )
+    
     return jsonify({"success": True, "competitor": new_comp})
 
 @app.route("/api/competitors/<int:competitor_id>", methods=["PUT"])
 def api_update_competitor(competitor_id: int):
     data = request.get_json(force=True, silent=True) or {}
-    comp = next((c for c in MOCK_DATA["competitors"] if c["id"] == competitor_id), None)
+    comp = competitor_store.get_by_id(competitor_id)
     if not comp:
         return jsonify({"error": "Competitor not found"}), 404
 
@@ -291,40 +287,37 @@ def api_update_competitor(competitor_id: int):
     if _is_nsfw_url(new_url):
         return jsonify({"error": "URL blocked by NSFW policy"}), 400
 
-    comp.update({
-        "name": new_name,
-        "changelog": new_url,
-        "description": data.get("description", comp.get("description", "")),
-        "status": data.get("status", comp.get("status", "active")),
-        "lastUpdate": _utcnow_iso(),
-    })
+    updated = competitor_store.update(
+        competitor_id,
+        new_name,
+        new_url,
+        data.get("description", comp.get("description", "")),
+        data.get("status", comp.get("status", "active")),
+    )
 
-    # sync config list
-    for c in config.COMPETITORS:
-        if c["name"] == comp["name"]:
-            c["name"] = new_name
-            c["changelog"] = new_url
-            break
+    
 
-    return jsonify({"success": True, "competitor": comp})
+    return jsonify({"success": True, "competitor": updated})
 
 @app.route("/api/competitors/<int:competitor_id>", methods=["DELETE"])
 def api_delete_competitor(competitor_id: int):
-    comp = next((c for c in MOCK_DATA["competitors"] if c["id"] == competitor_id), None)
+    comp = competitor_store.get_by_id(competitor_id)
     if not comp:
         return jsonify({"error": "Competitor not found"}), 404
 
     name = comp["name"]
 
     # remove from in-memory list
-    MOCK_DATA["competitors"] = [c for c in MOCK_DATA["competitors"] if c["id"] != competitor_id]
-    _reassign_ids()
+    removed = competitor_store.delete(competitor_id)
+    
 
     # purge history + snapshot
-    removed_changes = _purge_competitor_history(name)
+    removed_changes = _purge_competitor_history(
+    competitor_id,
+    name,
+)
 
-    # remove from config list
-    config.COMPETITORS[:] = [c for c in config.COMPETITORS if c["name"] != name]
+    
 
     return jsonify({"success": True, "removed_changes": removed_changes})
 
@@ -353,7 +346,7 @@ def api_get_changes():
 
 @app.route("/api/run-monitor", methods=["POST"])
 def api_run_monitor():
-    """Manual trigger: run scrape/diff/summarize; push Slack; cache results."""
+    """Manual trigger: run scrape/diff/summarize; push Discord; cache results."""
     status = MOCK_DATA["monitoring_status"]
     if status["isRunning"]:
         return jsonify({"error": "Monitor already running"}), 409
@@ -368,19 +361,11 @@ def api_run_monitor():
         status["failedRuns"] += 1
         return jsonify({"error": f"Monitor failed: {e}"}), 500
 
-    # Slack + summary
-    if changes:
-        summary = summarize_all(changes)
-        print(f"[DEBUG] Summary for Slack:\n{summary}")
-        if config.SLACK_WEBHOOK:
-            try:
-                send_slack(summary, config.SLACK_WEBHOOK)
-                print("[INFO] Slack notification sent.")
-            except Exception as e:
-                print(f"[ERROR] Slack send failed: {e}")
-        status["successfulRuns"] += 1
-    else:
-        summary = "No new changes detected."
+    summary = (
+        "Changes detected."
+        if changes
+        else "No new changes detected."
+    )
 
     # Cache change events for dashboard
     for competitor_name, change_list in (changes or {}).items():
@@ -452,7 +437,7 @@ def api_analytics():
 @app.route("/api/settings", methods=["GET"])
 def api_get_settings():
     return jsonify({
-        "slackWebhook": bool(os.getenv("SLACK_WEBHOOK")),
+        "discordWebhook": bool(os.getenv("DISCORD_WEBHOOK")),
         "groqApiKey": bool(os.getenv("GROQ_API_KEY")),
         "alwaysNotify": getattr(config, "ALWAYS_NOTIFY", False),
         "maxLinesPerCompetitor": getattr(config, "MAX_LINES_PER_COMPETITOR", 50),
@@ -476,47 +461,56 @@ def health():
 # ---------------------------------------------------------------------------
 
 def run_monitoring_job():
-    """Scheduled run (hourly)."""
+    """Run the monitor on the scheduled interval."""
+
     status = MOCK_DATA["monitoring_status"]
+
     if status["isRunning"]:
         print("[SCHED] Skipping scheduled run; already running.")
         return
 
     print("[SCHED] Scheduled monitoring run...")
+
     status["isRunning"] = True
     status["totalRuns"] += 1
 
     try:
         changes = run(return_changes=True) or {}
-    except Exception as e:
-        status["isRunning"] = False
-        status["failedRuns"] += 1
-        print(f"[SCHED][ERROR] run() failed: {e}")
-        return
 
-    if changes:
-        summary = summarize_all(changes)
-        if config.SLACK_WEBHOOK:
-            try:
-                send_slack(summary, config.SLACK_WEBHOOK)
-                print("[SCHED] Slack notification sent.")
-            except Exception as e:
-                print(f"[SCHED][ERROR] Slack failed: {e}")
-        status["successfulRuns"] += 1
-    else:
-        print("[SCHED] No changes detected.")
-
-    # cache events
-    for competitor_name, change_list in (changes or {}).items():
-        for line in change_list:
-            MOCK_DATA["recent_changes"].append(
-                _make_change_event(competitor_name, line, line, "scheduled")
+        if changes:
+            status["successfulRuns"] += 1
+            print(
+                f"[SCHED] Found changes for "
+                f"{len(changes)} competitors."
             )
+        else:
+            print("[SCHED] No changes detected.")
 
-    status["isRunning"] = False
-    status["lastRun"] = _utcnow_iso()
-    status["nextRun"] = (_utcnow() + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
-    MOCK_DATA["recent_changes"] = MOCK_DATA["recent_changes"][-100:]
+        for competitor_name, change_list in changes.items():
+            for line in change_list:
+                MOCK_DATA["recent_changes"].append(
+                    _make_change_event(
+                        competitor_name,
+                        line,
+                        line,
+                        "scheduled",
+                    )
+                )
+
+        MOCK_DATA["recent_changes"] = (
+            MOCK_DATA["recent_changes"][-100:]
+        )
+
+    except Exception as error:
+        status["failedRuns"] += 1
+        print(f"[SCHED][ERROR] run() failed: {error}")
+
+    finally:
+        status["isRunning"] = False
+        status["lastRun"] = _utcnow_iso()
+        status["nextRun"] = (
+            _utcnow() + timedelta(hours=1)
+        ).isoformat().replace("+00:00", "Z")
 
 
 def background_monitor():
