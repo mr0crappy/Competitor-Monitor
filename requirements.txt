@@ -8,3 +8,4 @@ flask-cors
 schedule
 python-dotenv
 gunicorn
+pytest
